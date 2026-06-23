@@ -1,0 +1,373 @@
+import java.util.*;
+
+// ================================================================
+//  SOCIAL NETWORK ANALYZER — Single File Version
+//  Discrete Structures Project | Java
+//  Classes: Graph, BFS, DFS, Analyzer, Main
+// ================================================================
+
+// ----------------------------------------------------------------
+// CLASS 1: Graph — Adjacency List Data Structure
+// ----------------------------------------------------------------
+class Graph {
+    private HashMap<String, List<String>> adjList;
+
+    public Graph() { adjList = new HashMap<>(); }
+
+    public void addPerson(String name) { adjList.putIfAbsent(name, new ArrayList<>()); }
+
+    public void addEdge(String person1, String person2) {
+        addPerson(person1); addPerson(person2);
+        if (!adjList.get(person1).contains(person2)) adjList.get(person1).add(person2);
+        if (!adjList.get(person2).contains(person1)) adjList.get(person2).add(person1);
+    }
+
+    public Graph removePersonCopy(String person) {
+        Graph copy = new Graph();
+        for (String node : adjList.keySet())
+            if (!node.equals(person)) copy.addPerson(node);
+        for (String node : adjList.keySet())
+            if (!node.equals(person))
+                for (String neighbor : adjList.get(node))
+                    if (!neighbor.equals(person)) copy.addEdge(node, neighbor);
+        return copy;
+    }
+
+    public Set<String>  getAllPeople()             { return adjList.keySet(); }
+    public List<String> getFriends(String person)  { return adjList.getOrDefault(person, new ArrayList<>()); }
+    public int          getTotalPeople()           { return adjList.size(); }
+    public boolean      hasPerson(String name)     { return adjList.containsKey(name); }
+
+    public int getTotalFriendships() {
+        int total = 0;
+        for (List<String> f : adjList.values()) total += f.size();
+        return total / 2;
+    }
+
+    public void displayNetwork() {
+        System.out.println("\n  Adjacency List (All Connections):");
+        System.out.println("  " + "-".repeat(40));
+        List<String> sorted = new ArrayList<>(adjList.keySet());
+        Collections.sort(sorted);
+        for (String person : sorted)
+            System.out.println("  " + person + " --> " + adjList.get(person));
+    }
+}
+
+// ----------------------------------------------------------------
+// CLASS 2: BFS — Shortest Path
+// ----------------------------------------------------------------
+class BFS {
+    private Graph graph;
+    public BFS(Graph graph) { this.graph = graph; }
+
+    public List<String> shortestPath(String source, String target) {
+        if (!graph.hasPerson(source) || !graph.hasPerson(target)) return null;
+        if (source.equals(target)) return Collections.singletonList(source);
+
+        Queue<String> queue = new LinkedList<>();
+        Map<String, String> parent = new HashMap<>();
+        Set<String> visited = new HashSet<>();
+        queue.add(source); visited.add(source); parent.put(source, null);
+
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            for (String neighbor : graph.getFriends(current)) {
+                if (!visited.contains(neighbor)) {
+                    visited.add(neighbor); parent.put(neighbor, current);
+                    if (neighbor.equals(target)) return reconstructPath(parent, target);
+                    queue.add(neighbor);
+                }
+            }
+        }
+        return null;
+    }
+
+    private List<String> reconstructPath(Map<String, String> parent, String target) {
+        List<String> path = new ArrayList<>();
+        String current = target;
+        while (current != null) { path.add(0, current); current = parent.get(current); }
+        return path;
+    }
+
+    public void displayShortestPath(String source, String target) {
+        System.out.println("\n  Shortest Path Finder (BFS)");
+        System.out.println("  " + "-".repeat(40));
+        if (!graph.hasPerson(source)) { System.out.println("  [!] Not found: " + source); return; }
+        if (!graph.hasPerson(target)) { System.out.println("  [!] Not found: " + target); return; }
+
+        List<String> path = shortestPath(source, target);
+        if (path == null) {
+            System.out.println("  No connection between " + source + " and " + target);
+        } else {
+            System.out.print("  Path: ");
+            for (int i = 0; i < path.size(); i++) {
+                System.out.print(path.get(i));
+                if (i < path.size() - 1) System.out.print(" --> ");
+            }
+            System.out.println("\n  Total Hops: " + (path.size() - 1));
+        }
+    }
+}
+
+// ----------------------------------------------------------------
+// CLASS 3: DFS — Reachability & Community Detection
+// ----------------------------------------------------------------
+class DFS {
+    private Graph graph;
+    public DFS(Graph graph) { this.graph = graph; }
+
+    public Set<String> dfsTraversal(String start, Set<String> visited) {
+        Stack<String> stack = new Stack<>();
+        stack.push(start);
+        while (!stack.isEmpty()) {
+            String current = stack.pop();
+            if (!visited.contains(current)) {
+                visited.add(current);
+                List<String> neighbors = new ArrayList<>(graph.getFriends(current));
+                Collections.sort(neighbors);
+                for (String n : neighbors)
+                    if (!visited.contains(n)) stack.push(n);
+            }
+        }
+        return visited;
+    }
+
+    public List<Set<String>> findCommunities() {
+        Set<String> globalVisited = new HashSet<>();
+        List<Set<String>> communities = new ArrayList<>();
+        List<String> allPeople = new ArrayList<>(graph.getAllPeople());
+        Collections.sort(allPeople);
+
+        for (String person : allPeople) {
+            if (!globalVisited.contains(person)) {
+                Set<String> community = new HashSet<>();
+                dfsTraversal(person, community);
+                communities.add(community);
+                globalVisited.addAll(community);
+            }
+        }
+        communities.sort((a, b) -> b.size() - a.size());
+        return communities;
+    }
+
+    public void displayReachability(String person) {
+        System.out.println("\n  Reachability Check (DFS)");
+        System.out.println("  " + "-".repeat(40));
+        if (!graph.hasPerson(person)) { System.out.println("  [!] Not found: " + person); return; }
+
+        Set<String> visited = new HashSet<>();
+        dfsTraversal(person, visited);
+        visited.remove(person);
+        List<String> sorted = new ArrayList<>(visited);
+        Collections.sort(sorted);
+
+        if (sorted.isEmpty()) System.out.println("  " + person + " has no connections.");
+        else System.out.println("  " + person + " can reach " + sorted.size() + " people:\n  " + sorted);
+    }
+
+    public void displayCommunities() {
+        System.out.println("\n  Community Detection (Connected Components via DFS)");
+        System.out.println("  " + "-".repeat(50));
+        List<Set<String>> communities = findCommunities();
+
+        if (communities.size() == 1) System.out.println("  All users are in one connected network!");
+        else System.out.println("  Found " + communities.size() + " separate communities:");
+
+        for (int i = 0; i < communities.size(); i++) {
+            List<String> members = new ArrayList<>(communities.get(i));
+            Collections.sort(members);
+            System.out.println("\n  Community " + (i + 1) + " (" + members.size() + " members):");
+            System.out.println("  --> " + members);
+        }
+    }
+}
+
+// ----------------------------------------------------------------
+// CLASS 4: Analyzer — Influencers, Bridge Nodes, Mutual Friends
+// ----------------------------------------------------------------
+class Analyzer {
+    private Graph graph;
+    private DFS dfs;
+    public Analyzer(Graph graph) { this.graph = graph; this.dfs = new DFS(graph); }
+
+    public void displayInfluencers() {
+        System.out.println("\n  Influencer Ranking (Degree Centrality)");
+        System.out.println("  " + "-".repeat(45));
+        Map<String, Integer> degreeMap = new HashMap<>();
+        for (String p : graph.getAllPeople()) degreeMap.put(p, graph.getFriends(p).size());
+
+        List<Map.Entry<String, Integer>> sorted = new ArrayList<>(degreeMap.entrySet());
+        sorted.sort((a, b) -> b.getValue() - a.getValue());
+
+        int rank = 1, prevScore = -1, displayRank = 1;
+        for (int i = 0; i < sorted.size(); i++) {
+            int score = sorted.get(i).getValue();
+            if (score != prevScore) displayRank = rank;
+            String star = (displayRank == 1) ? "  <-- Most Connected" : "";
+            System.out.printf("  #%-3d %-12s --> %d connection(s)%s%n",
+                    displayRank, sorted.get(i).getKey(), score, star);
+            prevScore = score;
+            rank++;
+        }
+    }
+
+    public void displayBridgeNodes() {
+        System.out.println("\n  Bridge Node Detection");
+        System.out.println("  " + "-".repeat(45));
+        int originalComponents = dfs.findCommunities().size();
+        List<String> bridges = new ArrayList<>();
+
+        for (String person : graph.getAllPeople()) {
+            Graph reduced = graph.removePersonCopy(person);
+            DFS rdfs = new DFS(reduced);
+            if (rdfs.findCommunities().size() > originalComponents) bridges.add(person);
+        }
+        Collections.sort(bridges);
+
+        if (bridges.isEmpty()) System.out.println("  No bridge nodes found. Network is robust.");
+        else {
+            System.out.println("  WARNING: Removing these splits the network:\n");
+            for (String b : bridges) System.out.println("  --> " + b + "  [CRITICAL NODE]");
+        }
+    }
+
+    public void displayMutualFriends(String p1, String p2) {
+        System.out.println("\n  Mutual Friends");
+        System.out.println("  " + "-".repeat(45));
+        if (!graph.hasPerson(p1)) { System.out.println("  [!] Not found: " + p1); return; }
+        if (!graph.hasPerson(p2)) { System.out.println("  [!] Not found: " + p2); return; }
+
+        Set<String> f1 = new HashSet<>(graph.getFriends(p1));
+        Set<String> f2 = new HashSet<>(graph.getFriends(p2));
+        f1.retainAll(f2);
+        List<String> mutual = new ArrayList<>(f1);
+        Collections.sort(mutual);
+
+        if (mutual.isEmpty()) System.out.println("  " + p1 + " and " + p2 + " have no mutual friends.");
+        else System.out.println("  Mutual friends of " + p1 + " and " + p2 + ":\n  --> " + mutual);
+    }
+}
+
+// ----------------------------------------------------------------
+// CLASS 5: Main — Menu Driver
+// ----------------------------------------------------------------
+public class Main {
+    static Graph    graph;
+    static BFS      bfs;
+    static DFS      dfs;
+    static Analyzer analyzer;
+    static Scanner  scanner = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        printBanner();
+        loadDefaultNetwork();
+        showNetworkSummary();
+        menuLoop();
+    }
+
+    static void printBanner() {
+        System.out.println();
+        System.out.println("  ============================================");
+        System.out.println("       SOCIAL NETWORK ANALYZER               ");
+        System.out.println("       Discrete Structures - Java             ");
+        System.out.println("  ============================================");
+    }
+
+    static void loadDefaultNetwork() {
+        graph = new Graph(); bfs = new BFS(graph); dfs = new DFS(graph); analyzer = new Analyzer(graph);
+
+        // Main community
+        graph.addEdge("Alice",   "Bob");
+        graph.addEdge("Alice",   "Charlie");
+        graph.addEdge("Bob",     "David");
+        graph.addEdge("Charlie", "David");
+        graph.addEdge("David",   "Eve");
+        graph.addEdge("Eve",     "Frank");
+        graph.addEdge("Frank",   "George");
+
+        // Separate community
+        graph.addEdge("Henry", "Isla");
+        graph.addEdge("Isla",  "Jack");
+
+        System.out.println("\n  [OK] Network loaded!");
+    }
+
+    static void showNetworkSummary() {
+        System.out.println("\n  --------------------------------------------");
+        System.out.printf ("  Total People      : %d%n", graph.getTotalPeople());
+        System.out.printf ("  Total Friendships : %d%n", graph.getTotalFriendships());
+        System.out.println("  --------------------------------------------");
+    }
+
+    static void menuLoop() {
+        while (true) {
+            System.out.println("\n  ============================================");
+            System.out.println("                   MAIN MENU                  ");
+            System.out.println("  ============================================");
+            System.out.println("  1. Show all connections");
+            System.out.println("  2. Find shortest path between two people");
+            System.out.println("  3. Check who a person can reach");
+            System.out.println("  4. Show all communities");
+            System.out.println("  5. Rank influencers");
+            System.out.println("  6. Find bridge (critical) nodes");
+            System.out.println("  7. Find mutual friends");
+            System.out.println("  8. Add a new friendship");
+            System.out.println("  9. Network summary");
+            System.out.println("  0. Exit");
+            System.out.println("  ============================================");
+            System.out.print("  Enter choice: ");
+
+            String input = scanner.nextLine().trim();
+            switch (input) {
+                case "1": graph.displayNetwork();        break;
+                case "2": handleShortestPath();          break;
+                case "3": handleReachability();          break;
+                case "4": dfs.displayCommunities();      break;
+                case "5": analyzer.displayInfluencers(); break;
+                case "6": analyzer.displayBridgeNodes(); break;
+                case "7": handleMutualFriends();         break;
+                case "8": handleAddFriendship();         break;
+                case "9": showNetworkSummary();          break;
+                case "0": System.out.println("\n  Goodbye! Stay connected.\n"); return;
+                default:  System.out.println("\n  [!] Invalid option. Enter 0-9.");
+            }
+        }
+    }
+
+    static void handleShortestPath() {
+        System.out.println("\n  People: " + sortedPeople());
+        System.out.print("  Source person : "); String src = scanner.nextLine().trim();
+        System.out.print("  Target person : "); String tgt = scanner.nextLine().trim();
+        bfs.displayShortestPath(src, tgt);
+    }
+
+    static void handleReachability() {
+        System.out.println("\n  People: " + sortedPeople());
+        System.out.print("  Enter person name: ");
+        dfs.displayReachability(scanner.nextLine().trim());
+    }
+
+    static void handleMutualFriends() {
+        System.out.println("\n  People: " + sortedPeople());
+        System.out.print("  First person  : "); String p1 = scanner.nextLine().trim();
+        System.out.print("  Second person : "); String p2 = scanner.nextLine().trim();
+        analyzer.displayMutualFriends(p1, p2);
+    }
+
+    static void handleAddFriendship() {
+        System.out.print("\n  First person  : "); String p1 = scanner.nextLine().trim();
+        System.out.print("  Second person : "); String p2 = scanner.nextLine().trim();
+        if (p1.isEmpty() || p2.isEmpty()) { System.out.println("  [!] Names cannot be empty."); return; }
+        graph.addEdge(p1, p2);
+        bfs = new BFS(graph); dfs = new DFS(graph); analyzer = new Analyzer(graph);
+        System.out.println("  [OK] Friendship added: " + p1 + " <--> " + p2);
+        showNetworkSummary();
+    }
+
+    static List<String> sortedPeople() {
+        List<String> p = new ArrayList<>(graph.getAllPeople());
+        Collections.sort(p);
+        return p;
+    }
+}
